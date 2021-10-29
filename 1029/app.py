@@ -5,8 +5,8 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 
-client = MongoClient('localhost', 27017)
-db = client.dbTest
+client = MongoClient("mongodb://localhost:27017/")
+db = client.dbTest3
 
 
 @app.route('/')
@@ -38,15 +38,37 @@ def save_post():
 @app.route('/articles', methods=['GET'])
 def get_posts():
     order = request.args.get('order')
+    per_page = request.args.get('perPage')
+    cur_page = request.args.get('curPage')
+    search_title = request.args.get('searchTitle')
+    search_condition = {}
+    if search_title is not None:
+        search_condition = {"title": {"$regex": search_title}}
+
+    limit = int(per_page)
+    skip = limit * (int(cur_page) - 1)
+    total_count = db.article.find(search_condition).count()
+    total_page = int(total_count / limit) + (1 if total_count % limit > 0 else 0)
+
     if order == "desc":
-        articles = list(db.article.find({}, {'_id': False}).sort([("read_count", -1)]))
+        articles = list(db.article.find(search_condition, {'_id': False})
+                        .sort([("read_count", -1)]).skip(skip).limit(limit))
     else:
-        articles = list(db.article.find({}, {'_id': False}).sort([("reg_date", -1)]))
+        articles = list(db.article.find(search_condition, {'_id': False})
+                        .sort([("reg_date", -1)]).skip(skip).limit(limit))
 
     for a in articles:
         a['reg_date'] = a['reg_date'].strftime('%Y.%m.%d %H:%M:%S')
 
-    return jsonify({"articles": articles})
+    paging_info = {
+        "totalCount": total_count,
+        "totalPage": total_page,
+        "perPage": per_page,
+        "curPage": cur_page,
+        "searchTitle": search_title
+    }
+
+    return jsonify({"articles": articles, "pagingInfo": paging_info})
 
 
 @app.route('/article', methods=['DELETE'])
@@ -78,12 +100,37 @@ def update_read_count(idx):
     article = db.article.find_one({'idx': int(idx)}, {'_id': False})
     return jsonify({"article": article})
 
-@app.route('/searchtitle', methods=['POST'])
-def search_title():
-    title = request.form.get('title')
-    lists = list(db.article.find({'title': {'$regex': title}}, {'_id': False}))
-    print(lists)
-    return jsonify({'lists': lists})
+# 회원가입
+@app.route('/sign-up', methods=['POST'])
+def sign_up():
+    signup_id = request.form['signup_id']
+    pw = request.form['signup_pw']
+
+    doc = {
+        'user_id': signup_id,
+        'pw': pw
+    }
+    db.user.insert_one(doc)
+
+    return jsonify({'msg': '저장완료'})
+
+# 로그인
+@app.route('/login', methods=['POST'])
+def login():
+    user_id = request.form['user_id']
+    pw = request.form['pw']
+
+    # 닉네임 확인
+    user = db.user.find_one({'user_id': user_id})
+    if user is None:
+        return jsonify({"msg": "INVALID_ID"})
+
+    # # 비밀번호 확인
+    user_pw = db.user.find_one({'pw': pw})
+    if user_pw is None:
+        return jsonify({"msg": "INVALID_PASSWORD"})
+
+    return jsonify({"msg": "SUCCESS"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
