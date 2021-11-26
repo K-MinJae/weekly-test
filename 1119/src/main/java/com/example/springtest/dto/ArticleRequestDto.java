@@ -1,9 +1,11 @@
 package com.example.springtest.dto;
 
 import lombok.Getter;
+import lombok.Setter;
 
+@Setter
 @Getter
-public class MemoRequestDto {
-    private String contents;
+public class ArticleRequestDto {
     private String title;
+    private String content;
 }
