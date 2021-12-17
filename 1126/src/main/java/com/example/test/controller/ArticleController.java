@@ -16,7 +16,6 @@ public class ArticleController {
 
     @PostMapping("/article")
     public Article setArticle(@RequestBody ArticleRequestDto articleRequestDto){
-        System.out.println(articleRequestDto);
         return articleService.setArticle(articleRequestDto);
     }
 
